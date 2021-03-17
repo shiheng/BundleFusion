@@ -18,15 +18,15 @@ PrimeSenseSensor::PrimeSenseSensor()
 
 PrimeSenseSensor::~PrimeSenseSensor()
 {
-	if (m_streams != NULL)
-	{
-		delete[] m_streams;
-	}
+	//if (m_streams != NULL)
+	//{
+	//	delete[] m_streams;
+	//}
 
 	m_depthStream.stop();
-	m_colorStream.stop();
+	//m_colorStream.stop();
 	m_depthStream.destroy();
-	m_colorStream.destroy();
+	//m_colorStream.destroy();
 	m_device.close();
 	openni::OpenNI::shutdown();
 
@@ -52,7 +52,8 @@ void PrimeSenseSensor::createFirstConnected()
 	std::cout << "After initialization: " << openni::OpenNI::getExtendedError() << std::endl;
 
 	// Create Device
-	rc = m_device.open("../data/readingroom.oni");//m_device.open(deviceURI);
+	//rc = m_device.open("../data/readingroom.oni");//m_device.open(deviceURI);
+	rc = m_device.open(deviceURI);
 	if (rc != openni::STATUS_OK)
 	{
 		std::cout << "Device open failed: " << openni::OpenNI::getExtendedError() << std::endl;
@@ -125,9 +126,9 @@ void PrimeSenseSensor::createFirstConnected()
 
 	RGBDSensor::init(depthWidth, depthHeight, colorWidth, colorHeight, 1);
 
-	m_streams = new openni::VideoStream*[2];
-	m_streams[0] = &m_depthStream;
-	m_streams[1] = &m_colorStream;
+	//m_streams = new openni::VideoStream*[2];
+	//m_streams[0] = &m_depthStream;
+	//m_streams[1] = &m_colorStream;
 
 	if (rc != openni::STATUS_OK)
 	{
@@ -156,6 +157,18 @@ void PrimeSenseSensor::createFirstConnected()
 	//t[0] /= 1000.0f; t[1] /= 1000.0f; t[2] /= 1000.0f;
 	//
 	//initializeDepthExtrinsics(R, t);
+
+	m_colorStream.stop();
+	m_colorStream.destroy();
+
+	m_colorCap.open(0);
+	if (!m_colorCap.isOpened())
+	{
+		std::cout << "Color capture open failed. Exiting" << std::endl;
+		return;
+	}
+	m_colorCap.set(CV_CAP_PROP_FRAME_WIDTH, colorWidth);
+	m_colorCap.set(CV_CAP_PROP_FRAME_HEIGHT, colorHeight);
 }
 
 bool PrimeSenseSensor::processDepth()
@@ -184,27 +197,33 @@ bool PrimeSenseSensor::readDepthAndColor(float* depthFloat, vec4uc* colorRGBX)
 	bool hr = true;
 
 	int changedIndex;
-	openni::Status rc = openni::OpenNI::waitForAnyStream(&m_streams[0], 1, &changedIndex, 0);
-	if (rc != openni::STATUS_OK) {
-		return false;	//no frame available
-	}
+	//openni::Status rc = openni::OpenNI::waitForAnyStream(&m_streams[0], 1, &changedIndex, 0);
+	//if (rc != openni::STATUS_OK) {
+	//	return false;	//no frame available
+	//}
 
-	rc = openni::OpenNI::waitForAnyStream(&m_streams[1], 1, &changedIndex, 0);
+	//rc = openni::OpenNI::waitForAnyStream(&m_streams[1], 1, &changedIndex, 0);
+	//if (rc != openni::STATUS_OK) {
+	//	return false;	//no frame available
+	//}
+
+	openni::VideoStream* pDepthStream = &m_depthStream;
+	openni::Status rc = openni::OpenNI::waitForAnyStream(&pDepthStream, 1, &changedIndex, 0);
 	if (rc != openni::STATUS_OK) {
 		return false;	//no frame available
 	}
 
 	openni::Status sd = m_depthStream.readFrame(&m_depthFrame);
-	openni::Status sc = m_colorStream.readFrame(&m_colorFrame);
+	//openni::Status sc = m_colorStream.readFrame(&m_colorFrame);
 
-	assert(m_colorFrame.getWidth() == m_depthFrame.getWidth());
-	assert(m_colorFrame.getHeight() == m_depthFrame.getHeight());
+	//assert(m_colorFrame.getWidth() == m_depthFrame.getWidth());
+	//assert(m_colorFrame.getHeight() == m_depthFrame.getHeight());
 
 	const openni::DepthPixel* pDepth = (const openni::DepthPixel*)m_depthFrame.getData();
-	const openni::RGB888Pixel* pImage = (const openni::RGB888Pixel*)m_colorFrame.getData();
 
 	// check if we need to draw depth frame to texture
-	if (m_depthFrame.isValid() && m_colorFrame.isValid())
+	//if (m_depthFrame.isValid() && m_colorFrame.isValid())
+	if (m_depthFrame.isValid())
 	{
 		unsigned int width = m_depthFrame.getWidth();
 		unsigned int nPixels = m_depthFrame.getWidth()*m_depthFrame.getHeight();
@@ -216,18 +235,29 @@ bool PrimeSenseSensor::readDepthAndColor(float* depthFloat, vec4uc* colorRGBX)
 			const openni::DepthPixel& p = pDepth[src];
 
 			float dF = (float)p*0.001f;
-			if (dF >= GlobalAppState::get().s_sensorDepthMin && dF <= GlobalAppState::get().s_sensorDepthMax) depthFloat[i] = dF;
-			else																	 depthFloat[i] = -std::numeric_limits<float>::infinity();
+			if (dF >= GlobalAppState::get().s_sensorDepthMin && dF <= GlobalAppState::get().s_sensorDepthMax)
+			{
+				depthFloat[i] = dF;
+			}
+			else
+			{
+				depthFloat[i] = -std::numeric_limits<float>::infinity();
+			}
 		}
 		incrementRingbufIdx();
 	}
 
 	// check if we need to draw depth frame to texture
-	if (m_depthFrame.isValid() && m_colorFrame.isValid())
+	//if (m_depthFrame.isValid() && m_colorFrame.isValid())
+	if (1)
 	{
-		unsigned int width = m_colorFrame.getWidth();
-		unsigned int height = m_colorFrame.getHeight();
-		unsigned int nPixels = m_colorFrame.getWidth()*m_colorFrame.getHeight();
+		cv::Mat colorFrame;
+		m_colorCap >> colorFrame;
+		const openni::RGB888Pixel* pImage = (const openni::RGB888Pixel*)colorFrame.data;
+
+		unsigned int width = colorFrame.rows;
+		unsigned int height = colorFrame.cols;
+		unsigned int nPixels = width * height;
 
 		for (unsigned int i = 0; i < nPixels; i++)
 		{
@@ -240,8 +270,8 @@ bool PrimeSenseSensor::readDepthAndColor(float* depthFloat, vec4uc* colorRGBX)
 
 			if (y2 >= 0 && y2 < (int)height)
 			{
-				//unsigned int Index1D = y2*width+x;
-				unsigned int Index1D = y2*width + (width - 1 - x);	//x-flip here
+				unsigned int Index1D = y2*width+x;
+				//unsigned int Index1D = y2*width + (width - 1 - x);	//x-flip here
 
 				const openni::RGB888Pixel& pixel = pImage[Index1D];
 
@@ -257,7 +287,6 @@ bool PrimeSenseSensor::readDepthAndColor(float* depthFloat, vec4uc* colorRGBX)
 			}
 		}
 	}
-
 
 	return hr;
 }

@@ -15,6 +15,8 @@
 #include <vector>
 #include <list>
 
+#include "opencv2/highgui/highgui.hpp"
+
 class PrimeSenseSensor : public RGBDSensor
 {
 public:
@@ -38,6 +40,11 @@ public:
 		return true;
 	}
 
+	std::string getSensorName() const
+	{
+		return "aaa";
+	}
+
 protected:
 	//! reads depth and color from the sensor
 	bool readDepthAndColor(float* depthFloat, vec4uc* colorRGBX);
@@ -58,12 +65,14 @@ protected:
 
 
 	openni::VideoFrameRef		m_depthFrame;
-	openni::VideoFrameRef		m_colorFrame;
+	//openni::VideoFrameRef		m_colorFrame;
 
 	openni::Device				m_device;
 	openni::VideoStream			m_depthStream;
 	openni::VideoStream			m_colorStream;
-	openni::VideoStream**		m_streams;
+	//openni::VideoStream**		m_streams;
+
+	cv::VideoCapture			m_colorCap;
 	
 };
 
